@@ -10,7 +10,6 @@ python = "^3.10"
 boto3 = "^1.42.68"
 python-dotenv = "^1.2.2"
 
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
