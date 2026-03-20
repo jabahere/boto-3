@@ -47,6 +47,89 @@ def delete_bucket (aws_s3_client, bucket_name) :
         return false
     return True
 
+def bucket_exists(aws_s3_client, bucket_name):
+    try:
+        response = aws_s3_client.head_bucket(Bucket=bucket_name)
+    except ClientError as e:
+        print(e)
+        return False
+    status_code = response["ResponseMetadata"]["HTTPStatusCode"]
+    if status_code == 200:
+        return True
+    return False
+
+
+def download_file_and_upload_to_s3(aws_s3_client,
+                                   bucket_name,
+                                   url,
+                                   file_name,
+                                   keep_local=False):
+    from urllib.request import urlopen
+    import io
+    with urlopen(url) as response:
+        content = response.read()
+        try:
+            aws_s3_client.upload_fileobj(
+                Fileobj=io.BytesIO(content),
+                Bucket=bucket_name,
+                ExtraArgs={'ContentType': 'image/jpg'},
+                Key=file_name)
+        except Exception as e:
+            print(e)
+
+    if keep_local:
+        with open(file_name, mode='wb') as file:
+            file.write(content)
+
+    return f"https://s3-us-west-2.amazonaws.com/{bucket_name}/{file_name}"
+
+
+def set_object_access_policy(aws_s3_client, bucket_name, file_name):
+    try:
+        response = aws_s3_client.put_object_acl(ACL="public-read",
+                                                Bucket=bucket_name,
+                                                Key=file_name)
+    except ClientError as e:
+        print(e)
+        return False
+    status_code = response["ResponseMetadata"]["HTTPStatusCode"]
+    if status_code == 200:
+        return True
+    return False
+
+
+def generate_public_read_policy(bucket_name):
+    policy = {
+        "Version":
+        "2012-10-17",
+        "Statement": [{
+            "Sid": "PublicReadGetObject",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": f"arn:aws:s3:::{bucket_name}/*",
+        }],
+    }
+
+    return json.dumps(policy)
+
+
+def create_bucket_policy(aws_s3_client, bucket_name):
+    aws_s3_client.delete_public_access_block(Bucket=bucket_name)
+    aws_s3_client.put_bucket_policy(
+        Bucket=bucket_name, Policy=generate_public_read_policy(bucket_name))
+    print("Bucket policy created successfully")
+
+
+def read_bucket_policy(aws_s3_client, bucket_name):
+    try:
+        policy = aws_s3_client.get_bucket_policy(Bucket=bucket_name)
+        policy_str = policy["Policy"]
+        print(policy_str)
+    except ClientError as e:
+        print(e)
+        return False
+
 def main():
     s3_client = init_client()
 
